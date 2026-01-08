@@ -1,0 +1,9 @@
+$pdf_mode = 1;
+$interaction = 'nonstopmode';
+$halt_on_error = 1;
+$silent = 1;
+
+# Keep output in the same folder as main.tex (simple for submissions).
+$out_dir = '.';
+
+

@@ -1,0 +1,34 @@
+build/
+build-gui/
+build-asan/
+bin/
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+*.dll
+*.dSYM/
+*.tmp
+.cache/
+.vscode/
+.idea/
+cmake-build-*/
+
+# Data and logs (keep sample CSVs if you want them versioned)
+data/backups/
+data/*.log
+
+# ImGui runtime state
+imgui.ini
+
+# LaTeX build artifacts
+docs/latex/*.aux
+docs/latex/*.fdb_latexmk
+docs/latex/*.fls
+docs/latex/*.log
+docs/latex/*.toc
+
+
