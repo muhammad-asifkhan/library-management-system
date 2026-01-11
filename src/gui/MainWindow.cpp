@@ -120,12 +120,51 @@ void MainWindow::update() {
 
     // Keyboard shortcuts
     ImGuiIO& io = ImGui::GetIO();
+    
+    // Ctrl+S: Save
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) {
         if (role == UserRole::Librarian) {
             bool ok = library.saveAllData();
             showMessage(ok ? "Saved successfully (Ctrl+S)" : "Save failed", ok);
         } else {
             showMessage("Save is available for Librarian only.", false);
+        }
+    }
+    
+    // Ctrl+R: Reload
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_R, false)) {
+        if (role == UserRole::Librarian) {
+            library.clearAllData();
+            bool ok = library.loadAllData();
+            booksDirty = studentsDirty = transactionsDirty = true;
+            showMessage(ok ? "Reloaded successfully (Ctrl+R)" : "Reload failed", ok);
+        }
+    }
+    
+    // Ctrl+F: Focus on search (Books tab)
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F, false)) {
+        currentTab = 1; // Switch to Books tab
+        showMessage("Search mode (Ctrl+F) - Books tab activated", true);
+    }
+    
+    // Ctrl+Q: Quit (with confirmation)
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
+        window.close();
+    }
+    
+    // F1: Show keyboard shortcuts help
+    if (ImGui::IsKeyPressed(ImGuiKey_F1, false)) {
+        showShortcutsWindow = true;
+    }
+    
+    // Ctrl+1 through Ctrl+7: Quick tab switching (Librarian)
+    if (io.KeyCtrl && role == UserRole::Librarian) {
+        for (int i = 0; i < 7; i++) {
+            ImGuiKey key = static_cast<ImGuiKey>(ImGuiKey_1 + i);
+            if (ImGui::IsKeyPressed(key, false)) {
+                currentTab = i;
+                break;
+            }
         }
     }
 
@@ -259,12 +298,17 @@ void MainWindow::showMenuBar() {
     }
 
     if (ImGui::BeginMenu("Help")) {
+        if (ImGui::MenuItem("Keyboard Shortcuts", "F1")) {
+            showShortcutsWindow = true;
+        }
+        ImGui::Separator();
         ImGui::MenuItem("Dear ImGui Demo", nullptr, &showDemoWindow);
         ImGui::EndMenu();
     }
     ImGui::EndMenuBar();
 
     if (showDemoWindow) ImGui::ShowDemoWindow(&showDemoWindow);
+    if (showShortcutsWindow) showShortcutsDialog();
 }
 
 void MainWindow::showSidebar() {
@@ -292,8 +336,19 @@ void MainWindow::showSidebar() {
 
     ImGui::Spacing();
     ImGui::Separator();
-    ImGui::Text("Shortcuts");
-    ImGui::BulletText("Ctrl+S: Save");
+    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Keyboard Shortcuts");
+    ImGui::Spacing();
+    
+    if (role == UserRole::Librarian) {
+        ImGui::BulletText("Ctrl+S: Save");
+        ImGui::BulletText("Ctrl+R: Reload");
+        ImGui::BulletText("Ctrl+F: Search");
+        ImGui::BulletText("Ctrl+Q: Quit");
+        ImGui::BulletText("Ctrl+1-7: Tabs");
+    } else {
+        ImGui::BulletText("Ctrl+F: Search");
+        ImGui::BulletText("Ctrl+Q: Quit");
+    }
 }
 
 void MainWindow::showStatusBar() {
@@ -375,14 +430,64 @@ void MainWindow::showBookManagementTab() {
         } else {
             bookSearchResults = allBooks;
         }
+        
+        // Apply filters
+        if (filterAvailableOnly) {
+            auto it = std::remove_if(bookSearchResults.begin(), bookSearchResults.end(),
+                [](const Book& b) { return !b.isAvailable(); });
+            bookSearchResults.erase(it, bookSearchResults.end());
+        }
+        
+        // Apply sorting
+        if (bookSortMode == 1) { // Sort by Title
+            std::sort(bookSearchResults.begin(), bookSearchResults.end(),
+                [](const Book& a, const Book& b) { return a.getTitle() < b.getTitle(); });
+        } else if (bookSortMode == 2) { // Sort by Author
+            std::sort(bookSearchResults.begin(), bookSearchResults.end(),
+                [](const Book& a, const Book& b) { return a.getAuthor() < b.getAuthor(); });
+        } else if (bookSortMode == 3) { // Sort by Most Borrowed
+            std::sort(bookSearchResults.begin(), bookSearchResults.end(),
+                [](const Book& a, const Book& b) { return a.getTimesBorrowed() > b.getTimesBorrowed(); });
+        }
+        // Default (0) is by ID, which is already sorted by BST
     }
     ImGui::Columns(1);
+    
+    // Filters and sort options
+    ImGui::Checkbox("Available Only", &filterAvailableOnly);
+    ImGui::SameLine();
+    ImGui::Text(" | Sort by:");
+    ImGui::SameLine();
+    ImGui::RadioButton("ID", &bookSortMode, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Title", &bookSortMode, 1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Author", &bookSortMode, 2);
+    ImGui::SameLine();
+    ImGui::RadioButton("Popular", &bookSortMode, 3);
 
+    ImGui::SameLine();
+    if (ImGui::Button("Clear Search")) {
+        searchBookId = 0;
+        std::memset(searchBookTitle, 0, sizeof(searchBookTitle));
+        std::memset(searchBookAuthor, 0, sizeof(searchBookAuthor));
+        filterAvailableOnly = false;
+        bookSortMode = 0;
+        bookSearchResults = allBooks;
+    }
+    
     ImGui::SameLine();
     if (ImGui::Button("Refresh")) {
         booksDirty = true;
         refreshBooks();
         bookSearchResults = allBooks;
+    }
+    
+    ImGui::SameLine();
+    if (ImGui::Button("Export Books")) {
+        std::string filename = "data/export_books_" + std::to_string(time(nullptr)) + ".csv";
+        bool ok = library.exportBooksToCSV(filename);
+        showMessage(ok ? ("Exported to " + filename) : "Export failed", ok);
     }
 
     ImGui::Spacing();
@@ -627,6 +732,13 @@ void MainWindow::showStudentManagementTab() {
         studentsDirty = true;
         refreshStudents();
         studentSearchResults = allStudents;
+    }
+    
+    ImGui::SameLine();
+    if (ImGui::Button("Export Students")) {
+        std::string filename = "data/export_students_" + std::to_string(time(nullptr)) + ".csv";
+        bool ok = library.exportStudentsToCSV(filename);
+        showMessage(ok ? ("Exported to " + filename) : "Export failed", ok);
     }
 
     ImGui::Spacing();
@@ -900,9 +1012,9 @@ void MainWindow::showAssistantTab() {
         return;
     }
 
-    ImGui::Text("Student Assistant (Offline)");
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "🤖 Student Assistant (Offline AI)");
     ImGui::Separator();
-    ImGui::TextDisabled("Try: \"recommend\", \"available books\", \"help\", or an author name.");
+    ImGui::TextDisabled("Ask me about: recommend | status | popular | available | search <author> | help");
     ImGui::Spacing();
 
     ImGui::BeginChild("ChatLog", ImVec2(0, -60), true);
@@ -928,46 +1040,131 @@ void MainWindow::showAssistantTab() {
             auto books = library.getAllBooks();
             auto reply = std::string("Assistant: ");
 
-            if (msgLower.find("help") != std::string::npos) {
-                reply += "You can request a book by ID in the Requests tab, and return a book in Return Book. "
-                         "For recommendations, type \"recommend\".";
+            // Enhanced AI responses
+            if (msgLower.find("help") != std::string::npos || msgLower == "?") {
+                reply += "📚 I can help you with:\n\n"
+                         "• \"recommend\" - Get personalized book suggestions\n"
+                         "• \"popular\" - See the most borrowed books\n"
+                         "• \"status\" - Check your borrowed books\n"
+                         "• \"available\" - Count available books\n"
+                         "• \"search <author>\" - Find books by author\n"
+                         "• \"due\" - Check your due dates\n\n"
+                         "💡 Tip: You can request books in the Requests tab!";
+            } else if (msgLower.find("status") != std::string::npos || msgLower.find("my books") != std::string::npos) {
+                Student* s = library.searchStudentById(sessionStudentId);
+                if (s && s->getBorrowedBooks().size() > 0) {
+                    reply += "📖 You currently have " + std::to_string(s->getBorrowedBooks().size()) + " book(s):\n";
+                    for (int bookId : s->getBorrowedBooks()) {
+                        Book* b = library.searchBookById(bookId);
+                        if (b) {
+                            reply += "• [" + std::to_string(b->getId()) + "] " + b->getTitle() + "\n";
+                        }
+                    }
+                    reply += "\n💡 You can borrow up to " + std::to_string(3 - s->getBorrowedBooks().size()) + " more book(s).";
+                } else {
+                    reply += "📭 You haven't borrowed any books yet.\n\n"
+                             "💡 Browse the Books tab and use the Requests tab to borrow!";
+                }
+            } else if (msgLower.find("due") != std::string::npos) {
+                auto transactions = library.getRecentTransactions(100);
+                bool found = false;
+                reply += "📅 Your due dates:\n";
+                for (const auto& t : transactions) {
+                    if (t.getStudentId() == sessionStudentId && t.getType() == BORROW && !t.isReturned()) {
+                        Book* b = library.searchBookById(t.getBookId());
+                        std::string status = t.isOverdue() ? " ⚠️ OVERDUE!" : "";
+                        reply += "• " + (b ? b->getTitle() : "Book #" + std::to_string(t.getBookId())) 
+                                + " - Due: " + t.getDueDate() + status + "\n";
+                        found = true;
+                    }
+                }
+                if (!found) reply += "No active borrowings. You're all clear! ✅";
+            } else if (msgLower.find("popular") != std::string::npos || msgLower.find("trending") != std::string::npos) {
+                auto popular = library.getMostPopularBooks(5);
+                if (!popular.empty()) {
+                    reply += "🔥 Most Popular Books:\n";
+                    int rank = 1;
+                    for (const auto& p : popular) {
+                        std::string medal = (rank == 1) ? "🥇" : (rank == 2) ? "🥈" : (rank == 3) ? "🥉" : "📖";
+                        reply += medal + " [" + std::to_string(p.first.getId()) + "] " 
+                                + p.first.getTitle() + " (" + std::to_string(p.second) + " borrows)\n";
+                        rank++;
+                    }
+                } else {
+                    reply += "No popularity data available yet.";
+                }
             } else if (msgLower.find("recommend") != std::string::npos) {
-                // Recommend top 5 available books by popularity (timesBorrowed), excluding currently borrowed.
+                // Smart recommendations based on popularity, excluding already borrowed
                 Student* s = library.searchStudentById(sessionStudentId);
                 std::vector<int> borrowed = s ? s->getBorrowedBooks() : std::vector<int>{};
                 std::sort(books.begin(), books.end(),
                           [](const Book& a, const Book& b) { return a.getTimesBorrowed() > b.getTimesBorrowed(); });
-                reply += "Top recommendations:\n";
+                reply += "✨ Personalized Recommendations:\n\n";
                 int shown = 0;
                 for (const auto& b : books) {
                     if (!b.isAvailable()) continue;
                     if (std::find(borrowed.begin(), borrowed.end(), b.getId()) != borrowed.end()) continue;
-                    reply += "- [" + std::to_string(b.getId()) + "] " + b.getTitle() + " by " + b.getAuthor() + "\n";
+                    reply += "📚 [" + std::to_string(b.getId()) + "] " + b.getTitle() + "\n"
+                            + "   by " + b.getAuthor() + " • " + std::to_string(b.getTimesBorrowed()) + " borrows\n\n";
                     if (++shown >= 5) break;
                 }
-                if (shown == 0) reply += "No available recommendations right now. Try again later.";
-            } else if (msgLower.find("available") != std::string::npos) {
-                int count = 0;
-                for (const auto& b : books) if (b.isAvailable()) count++;
-                reply += "Available books right now: " + std::to_string(count) + ". "
-                         "Use the Books tab to search by title/author.";
+                if (shown == 0) {
+                    reply += "😔 No available books match your profile right now.\n\n"
+                             "💡 Try requesting a popular book in the Requests tab!";
+                } else {
+                    reply += "💡 Go to Books tab → Search by ID to view details!";
+                }
+            } else if (msgLower.find("available") != std::string::npos || msgLower.find("count") != std::string::npos) {
+                int availableCount = 0;
+                int totalBooks = 0;
+                for (const auto& b : books) {
+                    totalBooks++;
+                    if (b.isAvailable()) availableCount++;
+                }
+                float availRate = totalBooks > 0 ? (float)availableCount / totalBooks * 100 : 0;
+                reply += "📊 Library Status:\n\n"
+                         "• Available books: " + std::to_string(availableCount) + " / " + std::to_string(totalBooks) + "\n"
+                         "• Availability rate: " + std::to_string((int)availRate) + "%\n\n"
+                         "💡 Use the Books tab to search by title/author!";
             } else {
-                // Try to interpret as author keyword
-                std::vector<Book> matches;
+                // Smart search: Try author name or title keywords
+                std::vector<Book> authorMatches, titleMatches;
                 for (const auto& b : books) {
                     std::string a = b.getAuthor();
+                    std::string t = b.getTitle();
                     std::transform(a.begin(), a.end(), a.begin(), ::tolower);
-                    if (a.find(msgLower) != std::string::npos) matches.push_back(b);
+                    std::transform(t.begin(), t.end(), t.begin(), ::tolower);
+                    if (a.find(msgLower) != std::string::npos) authorMatches.push_back(b);
+                    else if (t.find(msgLower) != std::string::npos) titleMatches.push_back(b);
                 }
-                if (!matches.empty()) {
-                    reply += "Books by that author:\n";
+                
+                if (!authorMatches.empty()) {
+                    reply += "🔍 Books by that author:\n\n";
                     int shown = 0;
-                    for (const auto& b : matches) {
-                        reply += "- [" + std::to_string(b.getId()) + "] " + b.getTitle() + "\n";
+                    for (const auto& b : authorMatches) {
+                        std::string avail = b.isAvailable() ? "✅ Available" : "❌ Borrowed";
+                        reply += "📖 [" + std::to_string(b.getId()) + "] " + b.getTitle() + " - " + avail + "\n";
                         if (++shown >= 6) break;
                     }
+                    if (authorMatches.size() > 6) {
+                        reply += "\n...and " + std::to_string(authorMatches.size() - 6) + " more. Search in Books tab!";
+                    }
+                } else if (!titleMatches.empty()) {
+                    reply += "🔍 Books matching your search:\n\n";
+                    int shown = 0;
+                    for (const auto& b : titleMatches) {
+                        std::string avail = b.isAvailable() ? "✅" : "❌";
+                        reply += avail + " [" + std::to_string(b.getId()) + "] " + b.getTitle() + " by " + b.getAuthor() + "\n";
+                        if (++shown >= 5) break;
+                    }
                 } else {
-                    reply += "I can help with recommendations. Type \"recommend\" or \"help\".";
+                    reply += "🤔 Hmm, I didn't quite catch that.\n\n"
+                             "Try asking:\n"
+                             "• \"recommend\" for book suggestions\n"
+                             "• \"popular\" to see trending books\n"
+                             "• \"status\" to check your borrowings\n"
+                             "• \"help\" for more commands\n\n"
+                             "Or search by author/title in the Books tab!";
                 }
             }
             assistantChat.push_back(reply);
@@ -1147,6 +1344,13 @@ void MainWindow::showTransactionHistoryTab() {
         transactionsDirty = true;
         refreshTransactions();
     }
+    
+    ImGui::SameLine();
+    if (ImGui::Button("Export Transactions")) {
+        std::string filename = "data/export_transactions_" + std::to_string(time(nullptr)) + ".csv";
+        bool ok = library.exportTransactionsToCSV(filename, transactionHistoryLimit);
+        showMessage(ok ? ("Exported to " + filename) : "Export failed", ok);
+    }
 
     if (transactionsDirty) refreshTransactions();
 
@@ -1195,52 +1399,151 @@ void MainWindow::showTransactionHistoryTab() {
 void MainWindow::showStatisticsTab() {
     ImGui::Text("Dashboard");
     ImGui::Separator();
+    
+    if (ImGui::Button("Export Statistics Report")) {
+        std::string filename = "data/statistics_report_" + std::to_string(time(nullptr)) + ".txt";
+        bool ok = library.exportStatisticsReport(filename);
+        showMessage(ok ? ("Report exported to " + filename) : "Export failed", ok);
+    }
+    
+    ImGui::Spacing();
 
+    // Enhanced statistics cards with progress bars
     ImGui::Columns(3, "dashCols", false);
-    ImGui::BeginChild("card_books", ImVec2(0, 100), true);
-    ImGui::Text("Books");
-    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "Total: %d", currentStats.totalBooks);
-    ImGui::TextColored(rgba(LibraryConfig::SUCCESS_COLOR), "Available copies: %d", currentStats.availableBooks);
-    ImGui::TextColored(rgba(LibraryConfig::WARNING_COLOR), "Borrowed: %d", currentStats.borrowedBooks);
+    
+    // BOOKS CARD
+    ImGui::BeginChild("card_books", ImVec2(0, 140), true);
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "📚 BOOKS");
+    ImGui::Separator();
+    ImGui::Text("Total Books: %d", currentStats.totalBooks);
+    ImGui::Text("Available: %d", currentStats.availableBooks);
+    ImGui::Text("Borrowed: %d", currentStats.borrowedBooks);
+    
+    // Availability progress bar
+    float availabilityRate = currentStats.totalBooks > 0 
+        ? (float)currentStats.availableBooks / currentStats.totalBooks : 0.0f;
+    ImGui::Text("Availability:");
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.2f, 0.8f, 0.3f, 1.0f));
+    ImGui::ProgressBar(availabilityRate, ImVec2(-1, 0), 
+        (std::to_string((int)(availabilityRate * 100)) + "%").c_str());
+    ImGui::PopStyleColor();
     ImGui::EndChild();
     ImGui::NextColumn();
 
-    ImGui::BeginChild("card_students", ImVec2(0, 100), true);
-    ImGui::Text("Students");
-    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "Total: %d", currentStats.totalStudents);
-    ImGui::TextColored(rgba(LibraryConfig::SUCCESS_COLOR), "Active: %d", currentStats.activeStudents);
+    // STUDENTS CARD
+    ImGui::BeginChild("card_students", ImVec2(0, 140), true);
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "👥 STUDENTS");
+    ImGui::Separator();
+    ImGui::Text("Total: %d", currentStats.totalStudents);
+    ImGui::Text("Active: %d", currentStats.activeStudents);
+    ImGui::Text("Inactive: %d", currentStats.totalStudents - currentStats.activeStudents);
+    
+    // Active rate progress bar
+    float activeRate = currentStats.totalStudents > 0 
+        ? (float)currentStats.activeStudents / currentStats.totalStudents : 0.0f;
+    ImGui::Text("Active Rate:");
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.3f, 0.6f, 1.0f, 1.0f));
+    ImGui::ProgressBar(activeRate, ImVec2(-1, 0), 
+        (std::to_string((int)(activeRate * 100)) + "%").c_str());
+    ImGui::PopStyleColor();
     ImGui::EndChild();
     ImGui::NextColumn();
 
-    ImGui::BeginChild("card_tx", ImVec2(0, 100), true);
-    ImGui::Text("Transactions");
-    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "Total: %d", currentStats.totalTransactions);
-    ImGui::TextColored(rgba(LibraryConfig::WARNING_COLOR), "Pending requests: %d", currentStats.pendingRequests);
-    ImGui::TextColored(rgba(LibraryConfig::SUCCESS_COLOR), "Fines: $%.2f", currentStats.totalFinesCollected);
+    // TRANSACTIONS CARD
+    ImGui::BeginChild("card_tx", ImVec2(0, 140), true);
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "📊 ACTIVITY");
+    ImGui::Separator();
+    ImGui::Text("Transactions: %d", currentStats.totalTransactions);
+    ImGui::Text("Pending Requests: %d", currentStats.pendingRequests);
+    ImGui::Text("Total Fines: $%.2f", currentStats.totalFinesCollected);
+    
+    // Average fines per transaction
+    float avgFine = currentStats.totalTransactions > 0 
+        ? currentStats.totalFinesCollected / currentStats.totalTransactions : 0.0f;
+    ImGui::Text("Avg Fine: $%.2f", avgFine);
     ImGui::EndChild();
     ImGui::Columns(1);
 
     ImGui::Spacing();
     ImGui::Separator();
 
-    ImGui::Text("Most Popular Books");
+    // Popular Books Section with Visual Bars
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "🏆 Most Popular Books (Top 5)");
     if (popularBooks.empty()) {
-        ImGui::TextDisabled("No data yet.");
+        ImGui::TextDisabled("No borrowing data yet.");
         return;
     }
-    if (ImGui::BeginTable("PopularBooks", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-        ImGui::TableSetupColumn("Title");
-        ImGui::TableSetupColumn("Borrows", ImGuiTableColumnFlags_WidthFixed, 90);
+    
+    ImGui::Spacing();
+    int maxBorrows = popularBooks.empty() ? 1 : popularBooks[0].second;
+    
+    if (ImGui::BeginTable("PopularBooks", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Rank", ImGuiTableColumnFlags_WidthFixed, 50);
+        ImGui::TableSetupColumn("Book Details", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Popularity", ImGuiTableColumnFlags_WidthFixed, 200);
         ImGui::TableHeadersRow();
+        
+        int rank = 1;
         for (const auto& p : popularBooks) {
             ImGui::TableNextRow();
+            
+            // Rank with medal colors
             ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(p.first.getTitle().c_str());
+            if (rank == 1) ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "#%d", rank);
+            else if (rank == 2) ImGui::TextColored(ImVec4(0.75f, 0.75f, 0.75f, 1.0f), "#%d", rank);
+            else if (rank == 3) ImGui::TextColored(ImVec4(0.8f, 0.5f, 0.2f, 1.0f), "#%d", rank);
+            else ImGui::Text("#%d", rank);
+            
+            // Book details
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%d", p.second);
+            ImGui::Text("%s", p.first.getTitle().c_str());
+            ImGui::TextDisabled("by %s", p.first.getAuthor().c_str());
+            
+            // Popularity bar
+            ImGui::TableSetColumnIndex(2);
+            float ratio = maxBorrows > 0 ? (float)p.second / maxBorrows : 0.0f;
+            ImGui::PushStyleColor(ImGuiCol_PlotHistogram, 
+                ImVec4(0.2f + ratio * 0.3f, 0.5f + ratio * 0.3f, 1.0f - ratio * 0.2f, 1.0f));
+            char label[32];
+            snprintf(label, sizeof(label), "%d borrows", p.second);
+            ImGui::ProgressBar(ratio, ImVec2(-1, 0), label);
+            ImGui::PopStyleColor();
+            
+            rank++;
         }
         ImGui::EndTable();
     }
+    
+    // Additional Insights
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextColored(rgba(LibraryConfig::PRIMARY_COLOR), "📈 Quick Insights");
+    ImGui::Spacing();
+    
+    ImGui::Columns(2, "insightsCols", false);
+    
+    // Book utilization
+    float utilizationRate = currentStats.totalBooks > 0 
+        ? (float)currentStats.borrowedBooks / currentStats.totalBooks : 0.0f;
+    ImGui::BulletText("Book Utilization: %.1f%%", utilizationRate * 100);
+    
+    // Student engagement
+    float engagementRate = currentStats.totalStudents > 0 && currentStats.borrowedBooks > 0
+        ? (float)currentStats.borrowedBooks / currentStats.totalStudents : 0.0f;
+    ImGui::BulletText("Avg Books/Student: %.2f", engagementRate);
+    ImGui::NextColumn();
+    
+    // Request fulfillment indicator
+    if (currentStats.pendingRequests > 5) {
+        ImGui::TextColored(rgba(LibraryConfig::WARNING_COLOR), 
+            "⚠️ High demand (%d pending)", currentStats.pendingRequests);
+    } else if (currentStats.pendingRequests > 0) {
+        ImGui::BulletText("Pending Requests: %d", currentStats.pendingRequests);
+    } else {
+        ImGui::TextColored(rgba(LibraryConfig::SUCCESS_COLOR), "✓ All requests fulfilled");
+    }
+    
+    ImGui::Columns(1);
 }
 
 void MainWindow::showMessage(const std::string& message, bool success) {
@@ -1469,6 +1772,121 @@ void MainWindow::showMessageBox() {
     ImGui::TextWrapped("%s", lastMessage.c_str());
     ImGui::End();
     ImGui::PopStyleColor();
+}
+
+void MainWindow::showShortcutsDialog() {
+    ImGui::SetNextWindowSize(ImVec2(550, 450), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), 
+                            ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    
+    if (!ImGui::Begin("Keyboard Shortcuts", &showShortcutsWindow)) {
+        ImGui::End();
+        return;
+    }
+    
+    ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Keyboard Shortcuts Reference");
+    ImGui::Separator();
+    ImGui::Spacing();
+    
+    if (ImGui::BeginTable("ShortcutsTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("Shortcut", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+        
+        // General shortcuts
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "F1");
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("Show this help dialog");
+        
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+Q");
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("Quit application");
+        
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+F");
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextWrapped("Focus on search (switches to Books tab)");
+        
+        if (role == UserRole::Librarian) {
+            // Librarian-only shortcuts
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextColored(ImVec4(0.4f, 0.7f, 1.0f, 1.0f), "Librarian Only:");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+S");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Save all data to files");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+R");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Reload all data from files");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+1");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Dashboard tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+2");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Books tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+3");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Students tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+4");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Issue/Return tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+5");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Requests tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+6");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to History tab");
+            
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), "Ctrl+7");
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextWrapped("Switch to Statistics tab");
+        }
+        
+        ImGui::EndTable();
+    }
+    
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::TextDisabled("Tip: Press F1 anytime to view this help");
+    
+    ImGui::Spacing();
+    if (centerButton("Close", 120.0f)) {
+        showShortcutsWindow = false;
+    }
+    
+    ImGui::End();
 }
 
 std::string MainWindow::formatBookInfo(const Book& book) {

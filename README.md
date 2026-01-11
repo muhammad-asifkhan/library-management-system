@@ -110,8 +110,8 @@ LibraryManagementSystem/
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/library-management-system.git
-cd library-management-system
+git clone https://github.com/muhammadasifkham/liberary-management-system.git
+cd liberary-management-system
 ```
 
 #### 2. Build the Project (GUI-first)
@@ -344,7 +344,16 @@ This project is part of an academic assignment. All rights reserved.
 
 ## 👥 Authors
 
-- Your Name - Initial work - [YourGitHub](https://github.com/yourusername)
+**Project Manager:** Suliman Naseeri
+
+**Team Members:**
+- Muhammad Asif Khan - Core implementation & integration - [GitHub](https://github.com/muhammadasifkham)
+- Nelorfar Hussain - UI/UX design and testing
+- Muneera Omer - Documentation lead
+- Momina Ali - Testing and QA
+- Muhammad Yousaf - Data structures review
+- Dawood Shah - File I/O and data formats
+- Hammad Durrani - Student assistant features
 
 ## 🙏 Acknowledgments
 
@@ -356,8 +365,8 @@ This project is part of an academic assignment. All rights reserved.
 ## 📮 Support
 
 For issues, questions, or contributions:
-- Open an issue on GitHub
-- Email: your.email@example.com
+- Open an issue on [GitHub](https://github.com/muhammadasifkham/liberary-management-system/issues)
+- Visit the [repository](https://github.com/muhammadasifkham/liberary-management-system)
 
 ## 🗺️ Roadmap
 
@@ -367,29 +376,92 @@ For issues, questions, or contributions:
 - [x] BST implementation
 - [x] GUI interface (Dear ImGui + SFML backend)
 
-### Phase 2: In Progress 🚧
+### Phase 2: Completed ✅
 - [x] Linked List for students
 - [x] Queue for requests
 - [x] Transaction history
 - [x] File I/O system
 
+### Phase 3: Completed ✅
+- [x] Dear ImGui interface
+- [x] Advanced search features (filters, sorting)
+- [x] Statistics and reports (with visualizations)
+- [x] Data export functionality
+
+### Recent Enhancements (v1.1 - January 2026) 🚀
+- [x] **Keyboard Shortcuts System**: F1, Ctrl+S/R/F/Q, Ctrl+1-7
+- [x] **Data Export**: CSV exports for books, students, transactions, statistics
+- [x] **Enhanced Search**: Filter by availability, sort by multiple criteria
+- [x] **Visual Statistics**: Progress bars, ranked popular books, utilization metrics
+- [x] **Intelligent Assistant**: 8+ commands with smart responses
+
 ### Note:
 As of January 2026, most test and debug files have been cleaned up for production. Run tests by rebuilding with `-DBUILD_TESTS=ON` and check `/tests/` for custom additions if needed.
 
-### Phase 3: Planned 📋
-- [ ] Dear ImGui interface
-- [ ] Advanced search features
-- [ ] Statistics and reports
-- [ ] Undo/Redo functionality
-
 ### Phase 4: Future Enhancements 💡
-- [ ] Multi-user support
-- [ ] Database integration
-- [ ] Web interface
-- [ ] Mobile app
+- [ ] Undo/Redo functionality
+- [ ] Multi-user concurrent access
+- [ ] Database integration (SQLite)
+- [ ] REST API for web/mobile clients
+- [ ] Mobile companion app
 
 ---
 
-**Version**: 1.0.0  
-**Last Updated**: January 2026  
-**Status**: Active Development
+## 📋 Changelog
+
+### Version 1.1 (January 11, 2026)
+**Major User Experience Enhancements**
+
+#### Added
+- 🎹 **Keyboard Shortcuts System**
+  - F1: Help dialog with all shortcuts
+  - Ctrl+S: Save data (Librarian)
+  - Ctrl+R: Reload data (Librarian)
+  - Ctrl+F: Focus search
+  - Ctrl+Q: Quit application
+  - Ctrl+1-7: Quick tab switching (Librarian)
+
+- 📊 **Data Export Features**
+  - Export books to CSV with full details
+  - Export students to CSV with borrowing history
+  - Export transaction history (configurable limit)
+  - Export statistics reports to TXT
+
+- 🔍 **Enhanced Search & Filtering**
+  - "Available Only" filter for books
+  - Sort by: ID, Title, Author, Most Borrowed
+  - Clear search button to reset all filters
+  - Live filtering and sorting
+
+- 📈 **Visual Statistics Dashboard**
+  - Progress bars for availability and active rates
+  - Ranked popular books with medal indicators (🥇🥈🥉)
+  - Visual popularity bars
+  - Quick insights: utilization, engagement, request status
+
+- 🤖 **Intelligent Student Assistant**
+  - 8+ commands: help, status, due, popular, recommend, available, search
+  - Personalized book recommendations
+  - Due date checking with overdue warnings
+  - Smart search by author or title
+  - Enhanced responses with emojis and tips
+
+#### Improved
+- Updated documentation (README, LaTeX report)
+- Team member information added
+- GitHub repository links updated
+
+### Version 1.0.0 (January 2026)
+**Initial Release**
+- Complete library management system
+- Role-based authentication (Student/Librarian)
+- GUI interface with Dear ImGui + SFML
+- BST-based book catalog
+- Transaction history and request queues
+- CSV data persistence
+
+---
+
+**Current Version**: 1.1.0  
+**Last Updated**: January 11, 2026  
+**Status**: Production Ready

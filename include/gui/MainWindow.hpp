@@ -26,6 +26,7 @@ private:
     
     // UI State
     bool showDemoWindow;
+    bool showShortcutsWindow = false;
     int currentTab;
     bool firstFrame = true;
     int themeIndex = 3; // 0=Mint, 1=Lavender, 2=Peach, 3=Light Blue (default)
@@ -74,6 +75,10 @@ private:
     char searchBookAuthor[256];
     std::vector<Book> bookSearchResults;
     int selectedBookIndex;
+    
+    // Enhanced search filters
+    bool filterAvailableOnly = false;
+    int bookSortMode = 0; // 0=ID, 1=Title, 2=Author, 3=Most Borrowed
 
     // Book modals
     bool showEditBookModal = false;
@@ -213,6 +218,11 @@ private:
      * @brief Format transaction information for display
      */
     std::string formatTransactionInfo(const Transaction& trans);
+    
+    /**
+     * @brief Show keyboard shortcuts help window
+     */
+    void showShortcutsDialog();
 };
 
 #endif // MAINWINDOW_HPP

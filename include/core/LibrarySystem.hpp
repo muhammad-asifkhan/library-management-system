@@ -6,6 +6,8 @@
 #include <vector>
 #include <map>
 #include <sstream>
+#include <fstream>
+#include <ctime>
 #include "../config.hpp"
 #include "Book.hpp"
 #include "Student.hpp"
@@ -730,6 +732,172 @@ public:
             count += book.getAvailableCount();
         }
         return count;
+    }
+    
+    // ========== DATA EXPORT ==========
+    
+    /**
+     * @brief Export books to CSV file
+     * @param filename Path to output file
+     * @return true if successful
+     */
+    bool exportBooksToCSV(const std::string& filename) const {
+        try {
+            std::ofstream file(filename);
+            if (!file.is_open()) return false;
+            
+            // Header
+            file << "ID,Title,Author,ISBN,Total Quantity,Available,Times Borrowed,Date Added\n";
+            
+            // Data
+            auto books = bookCatalog.getAllBooks();
+            for (const auto& book : books) {
+                file << book.getId() << ","
+                     << "\"" << book.getTitle() << "\","
+                     << "\"" << book.getAuthor() << "\","
+                     << book.getIsbn() << ","
+                     << book.getTotalQuantity() << ","
+                     << book.getAvailableCount() << ","
+                     << book.getTimesBorrowed() << ","
+                     << book.getDateAdded() << "\n";
+            }
+            
+            file.close();
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Export error: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+    /**
+     * @brief Export students to CSV file
+     * @param filename Path to output file
+     * @return true if successful
+     */
+    bool exportStudentsToCSV(const std::string& filename) const {
+        try {
+            std::ofstream file(filename);
+            if (!file.is_open()) return false;
+            
+            // Header
+            file << "ID,Name,Department,Email,Phone,Borrowed Books,Total Borrowed,Active\n";
+            
+            // Data
+            auto students = studentList.getAllStudents();
+            for (const auto& student : students) {
+                std::string borrowedBooks;
+                auto books = student.getBorrowedBooks();
+                for (size_t i = 0; i < books.size(); ++i) {
+                    borrowedBooks += std::to_string(books[i]);
+                    if (i < books.size() - 1) borrowedBooks += ";";
+                }
+                
+                file << student.getId() << ","
+                     << "\"" << student.getName() << "\","
+                     << "\"" << student.getDepartment() << "\","
+                     << "\"" << student.getEmail() << "\","
+                     << "\"" << student.getPhone() << "\","
+                     << "\"" << borrowedBooks << "\","
+                     << student.getTotalBorrowed() << ","
+                     << (student.getStatus() ? "Yes" : "No") << "\n";
+            }
+            
+            file.close();
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Export error: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+    /**
+     * @brief Export transaction history to CSV file
+     * @param filename Path to output file
+     * @param limit Maximum number of recent transactions (0 = all)
+     * @return true if successful
+     */
+    bool exportTransactionsToCSV(const std::string& filename, int limit = 0) const {
+        try {
+            std::ofstream file(filename);
+            if (!file.is_open()) return false;
+            
+            // Header
+            file << "Transaction ID,Type,Student ID,Book ID,Issue Date,Due Date,Return Date,Fine,Status\n";
+            
+            // Data
+            auto transactions = transactionHistory.getRecentTransactions(limit > 0 ? limit : 1000);
+            for (const auto& trans : transactions) {
+                file << trans.getTransactionId() << ","
+                     << trans.getTypeString() << ","
+                     << trans.getStudentId() << ","
+                     << trans.getBookId() << ","
+                     << trans.getIssueDate() << ","
+                     << trans.getDueDate() << ","
+                     << trans.getReturnDate() << ","
+                     << trans.getFine() << ","
+                     << (trans.isReturned() ? "Returned" : 
+                        (trans.isOverdue() ? "Overdue" : "Active")) << "\n";
+            }
+            
+            file.close();
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Export error: " << e.what() << std::endl;
+            return false;
+        }
+    }
+    
+    /**
+     * @brief Export statistics report to text file
+     * @param filename Path to output file
+     * @return true if successful
+     */
+    bool exportStatisticsReport(const std::string& filename) const {
+        try {
+            std::ofstream file(filename);
+            if (!file.is_open()) return false;
+            
+            auto stats = getStatistics();
+            auto popularBooks = getMostPopularBooks(10);
+            
+            file << "============================================\n";
+            file << "  LIBRARY MANAGEMENT SYSTEM - STATISTICS   \n";
+            file << "============================================\n\n";
+            
+            // Get current date
+            time_t now = time(nullptr);
+            file << "Report Generated: " << ctime(&now) << "\n";
+            
+            file << "\n--- BOOKS ---\n";
+            file << "Total Books: " << stats.totalBooks << "\n";
+            file << "Available Copies: " << stats.availableBooks << "\n";
+            file << "Borrowed Copies: " << (stats.totalBooks - stats.availableBooks) << "\n";
+            
+            file << "\n--- STUDENTS ---\n";
+            file << "Total Students: " << stats.totalStudents << "\n";
+            file << "Active Students: " << stats.activeStudents << "\n";
+            
+            file << "\n--- TRANSACTIONS ---\n";
+            file << "Total Transactions: " << stats.totalTransactions << "\n";
+            file << "Pending Requests: " << stats.pendingRequests << "\n";
+            file << "Total Fines Collected: $" << stats.totalFines << "\n";
+            
+            file << "\n--- TOP 10 POPULAR BOOKS ---\n";
+            int rank = 1;
+            for (const auto& [book, count] : popularBooks) {
+                file << rank++ << ". \"" << book.getTitle() << "\" by " 
+                     << book.getAuthor() << " (" << count << " borrows)\n";
+            }
+            
+            file << "\n============================================\n";
+            
+            file.close();
+            return true;
+        } catch (const std::exception& e) {
+            std::cerr << "Export error: " << e.what() << std::endl;
+            return false;
+        }
     }
 };
 
