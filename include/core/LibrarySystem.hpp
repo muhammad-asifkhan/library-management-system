@@ -578,7 +578,7 @@ public:
     /**
      * @brief Get system statistics
      */
-    SystemStatistics getStatistics() {
+    SystemStatistics getStatistics() const {
         SystemStatistics stats;
         
         auto books = bookCatalog.getAllBooks();
@@ -614,7 +614,7 @@ public:
     /**
      * @brief Get most popular books
      */
-    std::vector<std::pair<Book, int>> getMostPopularBooks(int limit = 5) {
+    std::vector<std::pair<Book, int>> getMostPopularBooks(int limit = 5) const {
         auto books = bookCatalog.getAllBooks();
         std::vector<std::pair<Book, int>> bookBorrows;
         
@@ -799,7 +799,7 @@ public:
                      << "\"" << student.getEmail() << "\","
                      << "\"" << student.getPhone() << "\","
                      << "\"" << borrowedBooks << "\","
-                     << student.getTotalBorrowed() << ","
+                     << student.getTotalBooksBorrowed() << ","
                      << (student.getStatus() ? "Yes" : "No") << "\n";
             }
             
@@ -835,8 +835,8 @@ public:
                      << trans.getIssueDate() << ","
                      << trans.getDueDate() << ","
                      << trans.getReturnDate() << ","
-                     << trans.getFine() << ","
-                     << (trans.isReturned() ? "Returned" : 
+                     << trans.getFineAmount() << ","
+                     << (trans.getType() == RETURN || !trans.getReturnDate().empty() ? "Returned" : 
                         (trans.isOverdue() ? "Overdue" : "Active")) << "\n";
             }
             
@@ -881,7 +881,7 @@ public:
             file << "\n--- TRANSACTIONS ---\n";
             file << "Total Transactions: " << stats.totalTransactions << "\n";
             file << "Pending Requests: " << stats.pendingRequests << "\n";
-            file << "Total Fines Collected: $" << stats.totalFines << "\n";
+            file << "Total Fines Collected: $" << stats.totalFinesCollected << "\n";
             
             file << "\n--- TOP 10 POPULAR BOOKS ---\n";
             int rank = 1;

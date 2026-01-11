@@ -1070,7 +1070,7 @@ void MainWindow::showAssistantTab() {
                 bool found = false;
                 reply += "📅 Your due dates:\n";
                 for (const auto& t : transactions) {
-                    if (t.getStudentId() == sessionStudentId && t.getType() == BORROW && !t.isReturned()) {
+                    if (t.getStudentId() == sessionStudentId && t.getType() == BORROW && t.getReturnDate().empty()) {
                         Book* b = library.searchBookById(t.getBookId());
                         std::string status = t.isOverdue() ? " ⚠️ OVERDUE!" : "";
                         reply += "• " + (b ? b->getTitle() : "Book #" + std::to_string(t.getBookId())) 
